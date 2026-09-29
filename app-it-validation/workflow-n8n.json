@@ -1,0 +1,858 @@
+{
+  "name": "App IT - Validation Onboarding/Offboarding avec aperçu mail",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "app-it-validation",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c4f91c9d-6c72-4147-bf53-58b39034abc5",
+      "name": "Webhook App IT",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        464
+      ],
+      "webhookId": "06e9fd4a-2a72-45ec-ad06-b7b44566718a",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HJw1wmTjKrfSFu4Z",
+          "name": "X-App-Token"
+        }
+      },
+      "notes": "Endpoint écoute l'app : POST /webhook/app-it-validation avec header X-App-Token"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.body || $input.first().json;\nconst email = String(raw.email || '').trim();\nconst agent = raw.agent || {};\nconst name = String(agent.name || '').trim();\nconst initial = String(agent.initial || '').trim();\nconst poste = String(agent.poste || '').trim();\nconst grade = String(agent.grade || '').trim().toLowerCase();\nconst type = String(raw.type || 'onboarding').trim().toLowerCase();\nconst validationMail = String(raw.validation_mail || '').trim().toUpperCase();\nconst errors = [];\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('email invalide');\nif (!name) errors.push('name agent manquant');\nif (!['onboarding', 'offboarding'].includes(type)) errors.push('type inconnu (attendu: onboarding|offboarding)');\nif (type === 'onboarding' && !['administrateur', 'technicien', 'stock', 'manager'].includes(grade)) errors.push('grade IT invalide (attendu: administrateur|technicien|stock|manager)');\nlet level = 'simple';\nif (['administrateur', 'technicien'].includes(grade)) level = 'it';\nelse if (grade === 'manager') level = 'superviseur';\nreturn [{ json: { valid: errors.length === 0, errors, validation_mail: validationMail, type, level, email, agent: { name, initial, poste, grade }, reference: 'IT-' + Date.now() } }];"
+      },
+      "id": "cb54cd10-a70d-4438-9a83-11671ab7fac4",
+      "name": "Valider payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        464
+      ],
+      "notes": "Normalise le payload et derive le niveau: administrateur/technicien=it, manager=superviseur, stock/autres=simple"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r1a",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "onboarding",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "r1b",
+                    "leftValue": "={{ $json.level }}",
+                    "rightValue": "it",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Onboarding IT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r2a",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "onboarding",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "r2b",
+                    "leftValue": "={{ $json.level }}",
+                    "rightValue": "superviseur",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Onboarding Superviseur+"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r3a",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "onboarding",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "r3b",
+                    "leftValue": "={{ $json.level }}",
+                    "rightValue": "simple",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Onboarding Simple"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "r4a",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "offboarding",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Offboarding"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Payload invalide"
+        }
+      },
+      "id": "9c486edd-81e4-4c49-9103-56ef8aab6a13",
+      "name": "Aiguiller demande",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/teams/demande-materiel",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ destinataire: 'gestionnaire-stock', sujet: 'Demande de materiel', agent: $json.agent, type: $json.type }) }}",
+        "options": {}
+      },
+      "id": "5e5596b9-d91d-4f9c-92df-1d1294ac316b",
+      "name": "Teams - demande materiel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        704,
+        320
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (Graph API / bot Teams) + la credential, puis activer le noeud"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/ad/users",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'create', name: $json.agent.name, initials: $json.agent.initial, poste: $json.agent.poste, upn: $json.email }) }}",
+        "options": {}
+      },
+      "id": "b8c6a8f0-22bd-47c4-ada4-78b684ac9bff",
+      "name": "AD - creation login",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        928,
+        320
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (API AD / PowerShell bridge) + credential, puis activer"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/shares/grant",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'grant', user: $json.agent.name, initials: $json.agent.initial, poste: $json.agent.poste }) }}",
+        "options": {}
+      },
+      "id": "c41b73f4-da9f-4ed0-978a-a3e12a48ec82",
+      "name": "Acces partages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1152,
+        320
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (API partages) + credential, puis activer"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g1",
+              "leftValue": "={{ $json.level }}",
+              "rightValue": "simple",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "006a5e3c-613d-469c-9e1b-5437b30d025a",
+      "name": "Superviseur et plus?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        320
+      ],
+      "notes": "true = IT ou superviseur -> etape GLPI; false = poste simple -> apercu mail"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/glpi/sessions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'create_user', name: $json.agent.name, initials: $json.agent.initial, email: $json.email }) }}",
+        "options": {}
+      },
+      "id": "f99154aa-2ff0-4dbf-8c1a-f271b395291b",
+      "name": "GLPI - creation compte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        224
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (API REST GLPI) + credential, puis activer"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g2",
+              "leftValue": "={{ $json.level }}",
+              "rightValue": "it",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6081c946-d242-4112-84bb-c0395543f7aa",
+      "name": "Poste IT?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        224
+      ],
+      "notes": "true = poste IT -> compte serveur; false = superviseur -> apercu mail"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/servers/accounts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'create', user: $json.agent.name, initials: $json.agent.initial, role: $json.agent.grade === 'administrateur' ? 'Administrateur' : 'Technicien' }) }}",
+        "options": {}
+      },
+      "id": "61a81ce9-5adb-4535-a3bf-fa53de80d53c",
+      "name": "Serveur - compte avec role",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2032,
+        128
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (API serveur / script d'infra) + credential, puis activer. Role derive du grade: administrateur->Administrateur, technicien->Technicien"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/access/revoke-all",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'offboarding', user: $json.agent.name, initials: $json.agent.initial, targets: ['ad', 'partages', 'glpi', 'serveurs'] }) }}",
+        "options": {}
+      },
+      "id": "2f5cf92e-6e89-40fa-a4cf-506192dc938d",
+      "name": "Supprimer acces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        704,
+        624
+      ],
+      "disabled": true,
+      "notes": "Configurer l'URL reelle (API suppression des acces) + credential, puis activer"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst a = d.agent || {};\nconst serverRole = a.grade === 'administrateur' ? 'Administrateur' : 'Technicien';\nlet steps;\nif (d.type === 'onboarding') {\n  steps = [\n    'Message Teams au gestionnaire stock (demande de materiel)',\n    'Creation login sur AD',\n    'Acces partages',\n  ];\n  if (d.level === 'superviseur' || d.level === 'it') steps.push('Creation compte GLPI');\n  if (d.level === 'it') steps.push('Compte serveur avec role ' + serverRole);\n} else {\n  steps = [\n    'Suppression login AD',\n    'Revocation des acces partages',\n    'Desactivation compte GLPI',\n    'Suppression des comptes serveur',\n  ];\n}\nconst titre = d.type === 'onboarding' ? 'Onboarding' : 'Offboarding';\nconst subject = '[' + titre + '] ' + a.name + ' (' + a.initial + ') - ' + (a.poste || 'poste non precise');\nconst rows = steps.map((s, i) => '<tr><td style=\"padding:6px 10px;border:1px solid #ddd;text-align:center\">' + (i + 1) + '</td><td style=\"padding:6px 10px;border:1px solid #ddd\">' + s + '</td><td style=\"padding:6px 10px;border:1px solid #ddd;color:#1a7f37\">Effectue</td></tr>').join('');\nconst bodyHtml = '<div style=\"font-family:Arial,sans-serif;max-width:640px\">'\n  + '<h2 style=\"color:#0b5fff\">Demande ' + titre.toLowerCase() + ' traitee</h2>'\n  + '<p>Bonjour,</p><p>La demande <b>' + titre.toLowerCase() + '</b> pour <b>' + a.name + '</b> (initials: ' + a.initial + ', poste: ' + (a.poste || '-') + ', grade IT: ' + (a.grade || '-') + ', email: ' + d.email + ') a ete traitee.</p>'\n  + '<table style=\"border-collapse:collapse;width:100%\"><tr><th style=\"padding:6px 10px;border:1px solid #ddd\">#</th><th style=\"padding:6px 10px;border:1px solid #ddd\">Action</th><th style=\"padding:6px 10px;border:1px solid #ddd\">Statut</th></tr>' + rows + '</table>'\n  + '<p style=\"color:#666\">Reference: ' + d.reference + ' — ' + DateTime.now().toFormat('yyyy-MM-dd HH:mm') + '</p></div>';\nconst mailText = 'Bonjour,\\n\\nLa demande ' + titre.toLowerCase() + ' pour ' + a.name + ' (' + a.initial + ') a ete traitee.\\n\\n' + steps.map((s, i) => (i + 1) + '. ' + s + ' - Effectue').join('\\n') + '\\n\\nReference: ' + d.reference;\nreturn [{ json: Object.assign({}, d, { mailSubject: subject, mailBodyHtml: bodyHtml, mailText: mailText }) }];"
+      },
+      "id": "1a94942a-791a-44c3-a4df-c2c9c46faac5",
+      "name": "Construire apercu mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"reference\": $json.reference, \"statut\": \"actions_executees_attente_validation_mail\", \"type\": $json.type, \"niveau\": $json.level, \"lien_apercu_validation\": $execution.resumeFormUrl } }}",
+        "options": {}
+      },
+      "id": "54a394e4-3d8e-4576-b64f-c57e46b43528",
+      "name": "Reponse a l'app",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2480,
+        464
+      ],
+      "notes": "L'app recoit le lien d'aperçu; l'agent/validateur ouvre ce lien pour confirmer l'envoi du mail"
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Validation d'envoi du mail d'accomplissement",
+        "formDescription": "={{ '<h3>Aperçu du mail — Objet : ' + $json.mailSubject + '</h3>' + $json.mailBodyHtml + '<hr/><p><b>Référence : ' + $json.reference + '.</b> Les actions IT sont déjà exécutées ; confirmez ou annulez l'envoi du mail de notification.</p>' }}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "validation_mail",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "OK"
+                  },
+                  {
+                    "option": "annuler"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5df40d49-01da-4faf-b302-be145ad8596b",
+      "name": "Apercu et validation envoi",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        464
+      ],
+      "webhookId": "be980766-f388-4546-83c8-13f358179f2f",
+      "notes": "Met le workflow en attente sur une page d'aperçu du mail; reprise quand le validateur soumet le formulaire"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "dec",
+              "leftValue": "={{ $json.validation_mail }}",
+              "rightValue": "OK",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e72af1d2-b225-4fc6-8127-4493dbb2ea6a",
+      "name": "Decision envoi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2928,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REMPLACER-API-INTERNE.local/api/mail/send",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.email, subject: $json.mailSubject, html: $json.mailBodyHtml, text: $json.mailText }) }}",
+        "options": {}
+      },
+      "id": "c5a74cd7-17c5-46d7-a91f-ca3ce6d6f635",
+      "name": "Envoyer le mail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3152,
+        384
+      ],
+      "disabled": true,
+      "notes": "A activier seulement apres validation du formulaire. Soit cette API mail interne, soit un node Send Email (SMTP) a ajouter quand le compte SMTP sera configure"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"erreur\": \"requete_invalide\", \"details\": $('Valider payload').first().json.errors } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "96cb0fa1-8feb-418b-94bb-927171e3c55e",
+      "name": "Reponse invalide",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        704,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "v1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0cf75f5-be45-49d2-9980-e091a207e8f7",
+      "name": "Payload valide?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        704
+      ],
+      "notes": "true = continuer l'aiguillage; false = 400 vers Reponse invalide"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "val-ok",
+              "leftValue": "={{ $json.validation_mail }}",
+              "rightValue": "OK",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "edc1e202-e889-486a-b93b-0ddd5facbcdb",
+      "name": "Validation prealable OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2384,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"reference\": $json.reference, \"statut\": \"validation_ok_actions_executees_mail_envoi\", \"type\": $json.type, \"niveau\": $json.level, \"validation_mail\": $json.validation_mail } }}",
+        "options": {}
+      },
+      "id": "da568c2c-a331-4d69-bf9a-94c4b99de476",
+      "name": "Reponse app deja validee",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2592,
+        704
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook App IT": {
+      "main": [
+        [
+          {
+            "node": "Valider payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aiguiller demande": {
+      "main": [
+        [
+          {
+            "node": "Teams - demande materiel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Teams - demande materiel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Teams - demande materiel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supprimer acces",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reponse invalide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teams - demande materiel": {
+      "main": [
+        [
+          {
+            "node": "AD - creation login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AD - creation login": {
+      "main": [
+        [
+          {
+            "node": "Acces partages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acces partages": {
+      "main": [
+        [
+          {
+            "node": "Superviseur et plus?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Superviseur et plus?": {
+      "main": [
+        [
+          {
+            "node": "GLPI - creation compte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Construire apercu mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GLPI - creation compte": {
+      "main": [
+        [
+          {
+            "node": "Poste IT?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poste IT?": {
+      "main": [
+        [
+          {
+            "node": "Serveur - compte avec role",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Construire apercu mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serveur - compte avec role": {
+      "main": [
+        [
+          {
+            "node": "Construire apercu mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supprimer acces": {
+      "main": [
+        [
+          {
+            "node": "Construire apercu mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reponse a l'app": {
+      "main": [
+        [
+          {
+            "node": "Apercu et validation envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apercu et validation envoi": {
+      "main": [
+        [
+          {
+            "node": "Decision envoi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision envoi?": {
+      "main": [
+        [
+          {
+            "node": "Envoyer le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valider payload": {
+      "main": [
+        [
+          {
+            "node": "Payload valide?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload valide?": {
+      "main": [
+        [
+          {
+            "node": "Aiguiller demande",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reponse invalide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construire apercu mail": {
+      "main": [
+        [
+          {
+            "node": "Validation prealable OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation prealable OK?": {
+      "main": [
+        [
+          {
+            "node": "Reponse app deja validee",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reponse a l'app",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reponse app deja validee": {
+      "main": [
+        [
+          {
+            "node": "Envoyer le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Indian/Antananarivo",
+    "binaryMode": "separate"
+  }
+}

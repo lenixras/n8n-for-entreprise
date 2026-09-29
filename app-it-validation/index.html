@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App IT — Validation Onboarding/Offboarding</title>
+<style>
+  :root { --bleu:#0b5fff; --gris:#f5f7fa; --bord:#dde3ec; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", Arial, sans-serif; background: var(--gris); margin: 0; padding: 24px; }
+  .carte { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(15,35,95,.08); padding: 28px; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; color: #10203f; }
+  .sous { color: #67748c; font-size: .875rem; margin: 0 0 20px; }
+  label { display: block; font-size: .8rem; font-weight: 600; color: #3c4a63; margin: 14px 0 5px; }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 8px; font-size: .95rem; background:#fff; }
+  input:focus, select:focus { outline: 2px solid var(--bleu); border-color: var(--bleu); }
+  .ligne { display: flex; gap: 12px; }
+  .ligne > div { flex: 1; }
+  .types { display: flex; gap: 10px; margin-top: 6px; }
+  .types button { flex: 1; padding: 11px; border: 1px solid var(--bord); background: #fff; border-radius: 8px; font-weight: 600; color: #3c4a63; cursor: pointer; }
+  .types button.sel { background: var(--bleu); color: #fff; border-color: var(--bleu); }
+  #gradeBloc { display: none; }
+  #gradeBloc.vis { display: block; }
+  .btn { width: 100%; margin-top: 22px; padding: 13px; background: var(--bleu); color: #fff; border: 0; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .err { color: #c62828; font-size: .85rem; margin-top: 8px; white-space: pre-wrap; }
+  .ok { margin-top: 18px; padding: 14px 16px; background: #ecf7ef; border: 1px solid #bfe3c8; border-radius: 8px; font-size: .9rem; color: #1a5f2f; }
+  .ok a { color: var(--bleu); font-weight: 700; }
+  .ok code { background:#fff; padding:2px 6px; border-radius:4px; }
+  .check { display:flex; align-items:center; gap:8px; margin-top:16px; }
+  .check input { width:auto; }
+  .check label { margin:0; font-weight:600; color:#3c4a63; font-size:.85rem; }
+  .config { border:1px dashed var(--bord); border-radius:10px; padding:4px 14px 14px; margin-bottom:18px; background:#fafbfd; }
+  .config summary { cursor:pointer; font-size:.8rem; font-weight:700; color:#3c4a63; padding:10px 0; }
+  .config .note { font-size:.72rem; color:#67748c; margin:4px 0 0; }
+  .btn-save { margin-top:12px; padding:8px 14px; background:#3c4a63; color:#fff; border:0; border-radius:6px; font-size:.8rem; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="carte">
+  <h1>Demande IT</h1>
+  <p class="sous">Onboarding / offboarding — cochez « deja validee » (validation_mail = OK) pour enchaîner directement la suite du workflow.</p>
+
+  <details class="config">
+    <summary>⚙️ Endpoint webhook n8n (listening)</summary>
+    <label for="cfgUrl">URL du webhook (node Webhook App IT)</label>
+    <input type="url" id="cfgUrl" placeholder="http://localhost:5678/webhook/app-it-validation">
+    <label for="cfgToken">Jeton (en-tete X-App-Token)</label>
+    <input type="text" id="cfgToken" placeholder="collez le token du credential header">
+    <button type="button" class="btn-save" id="cfgSave">Enregistrer</button>
+    <p class="note">Verifiez le webhook dans n8n : node <b>Webhook App IT</b> — methode <code>POST</code>, chemin <code>app-it-validation</code> (prod = <code>/webhook/…</code>, test = <code>/webhook-test/…</code> avec le workflow lance en mode Ecouter). Enregistre dans ce navigateur.</p>
+    <p class="note" id="cfgMsg"></p>
+  </details>
+
+  <form id="frm" novalidate>
+    <label>Type de demande</label>
+    <div class="types">
+      <button type="button" id="btnOn" class="sel">Onboarding</button>
+      <button type="button" id="btnOff">Offboarding</button>
+    </div>
+
+    <div class="ligne">
+      <div>
+        <label for="name">Nom agent</label>
+        <input type="text" id="name" placeholder="Nomeny Rasolonjato" required>
+      </div>
+      <div style="flex:0 0 90px">
+        <label for="initial">Initial</label>
+        <input type="text" id="initial" maxlength="4" placeholder="NR" required>
+      </div>
+    </div>
+
+    <label for="poste">Poste</label>
+    <input type="text" id="poste" placeholder="Administrateur systeme" required>
+
+    <div id="gradeBloc">
+      <label for="grade">Grade IT</label>
+      <select id="grade">
+        <option value="administrateur">Administrateur</option>
+        <option value="technicien">Technicien</option>
+        <option value="stock">Stock</option>
+        <option value="manager">Manager</option>
+      </select>
+    </div>
+
+    <div class="check">
+      <input type="checkbox" id="valide">
+      <label for="valide">Demande deja validee (validation_mail = OK)</label>
+    </div>
+
+    <button class="btn" type="submit" id="sub">Envoyer la demande</button>
+    <div class="err" id="err"></div>
+    <div class="ok" id="ok" hidden></div>
+  </form>
+</div>
+
+<script>
+const DEFAULTS = {
+  webhookUrl: "http://localhost:5678/webhook/app-it-validation",
+  appToken: "" // ne jamais mettre de secret en dur — saisir le jeton dans le panneau "Endpoint webhook n8n"
+};
+const STORE_KEY = "app-it-config";
+
+function loadConfig() {
+  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); }
+  catch { return Object.assign({}, DEFAULTS); }
+}
+let CONFIG = loadConfig();
+
+function renderConfig() {
+  $("cfgUrl").value = CONFIG.webhookUrl;
+  $("cfgToken").value = CONFIG.appToken;
+}
+
+let type = "onboarding";
+const $ = (id) => document.getElementById(id);
+const gradeBloc = $("gradeBloc");
+
+function setType(t) {
+  type = t;
+  $("btnOn").classList.toggle("sel", t === "onboarding");
+  $("btnOff").classList.toggle("sel", t === "offboarding");
+  gradeBloc.classList.toggle("vis", t === "onboarding");
+}
+$("btnOn").onclick = () => setType("onboarding");
+$("btnOff").onclick = () => setType("offboarding");
+
+$("cfgSave").onclick = () => {
+  const url = $("cfgUrl").value.trim();
+  const token = $("cfgToken").value.trim();
+  if (!url) { $("cfgMsg").textContent = "URL requise."; return; }
+  if (!token) { $("cfgMsg").textContent = "Jeton X-App-Token requis — sinon n8n repond \"No authentication data defined on node!\""; return; }
+  CONFIG = { webhookUrl: url, appToken: token };
+  localStorage.setItem(STORE_KEY, JSON.stringify(CONFIG));
+  $("cfgMsg").textContent = "Enregistre : " + url;
+};
+
+renderConfig();
+
+$("frm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("err").textContent = "";
+  $("ok").hidden = true;
+  const name = $("name").value.trim();
+  const initial = $("initial").value.trim();
+  const poste = $("poste").value.trim();
+  const grade = $("grade").value;
+
+  if (!name) return $("err").textContent = "Nom agent requis.";
+  if (!initial) return $("err").textContent = "Initial requis.";
+  if (!poste) return $("err").textContent = "Poste requis.";
+
+  const payload = { type, agent: { name, initial, poste } };
+  if (type === "onboarding") payload.agent.grade = grade;
+  if ($("valide").checked) payload.validation_mail = "OK";
+
+  if (!CONFIG.appToken) {
+    document.querySelector(".config").open = true;
+    renderConfig();
+    return $("err").textContent = "Jeton manquant : renseignez l'URL et le token X-App-Token dans \"Endpoint webhook n8n\" puis Enregistrer.";
+  }
+
+  $("sub").disabled = true;
+  try {
+    const res = await fetch(CONFIG.webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-App-Token": CONFIG.appToken },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    let data = {};
+    try { data = JSON.parse(text); }
+    catch {
+      $("err").textContent = "Reponse n8n non-JSON (" + res.status + ") : " + text.slice(0, 160);
+      return;
+    }
+    if (!res.ok) {
+      const details = (data.details || []).join(", ");
+      $("err").textContent = "Erreur " + res.status + (details ? " : " + details : "");
+      return;
+    }
+    $("ok").innerHTML =
+      "Demande enregistree — référence <code>" + data.reference + "</code>.<br>" +
+      (data.lien_apercu_validation
+        ? "Ouvrir l'aperçu du mail pour valider l'envoi : " +
+          '<a href="' + data.lien_apercu_validation + '" target="_blank" rel="noopener">' + data.lien_apercu_validation + "</a>"
+        : "Statut : <code>" + data.statut + "</code> — suite du workflow enchainée directement.");
+    $("frm").reset();
+    setType("onboarding");
+  } catch (err) {
+    $("err").textContent = "Echec d'appel au webhook : " + err.message;
+  } finally {
+    $("sub").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
