@@ -6,7 +6,7 @@
 ## Fonctionnalités
 
 - **Détection temps réel** : les nouveaux tickets GLPI (statut NEW) sont relevés toutes les minutes, sur une fenêtre glissante de 24 h
-- **Triple notification** : WhatsApp Direction (+261 32 398 488), WhatsApp Support (+261 330 531 966) et POST webhook externe (JSON toujours valide)
+- **Triple notification** : WhatsApp Direction, WhatsApp Support et POST webhook externe (JSON toujours valide)
 - **Anti-doublon persistant** : chaque ticket est marqué dans la table de suivi, marquage idempotent — aucun envoi répété
 - **Message propre** : HTML décodé et supprimé, espaces normalisés, description tronquée à 3 000 caractères, message construit une seule fois
 - **Résilient** : 3 tentatives automatiques sur chaque sortie, et toute erreur fait échouer l'exécution de façon visible (nœud `6 Échec`) — jamais d'échec silencieux
@@ -22,8 +22,8 @@
    │
    └─ 3  Préparer notifications  ← filtre les nouveaux, nettoie le HTML,
         │                           construit le message UNE seule fois
-        ├─ 4.1  WhatsApp Direction  (+261 32 398 488)
-        ├─ 4.2  WhatsApp Support    (+261 330 531 966)
+        ├─ 4.1  WhatsApp Direction  
+        ├─ 4.2  WhatsApp Support    
         ├─ 4.3  Webhook HTTP        (POST 192.168.60.253:8080)
         └─ 5    Marquer comme notifié (anti-doublon, idempotent)
 
