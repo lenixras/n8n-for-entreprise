@@ -1,0 +1,353 @@
+{
+  "name": "GLPI NOTIF — optimisé",
+  "active": false,
+  "description": "Surveille les nouveaux tickets GLPI (statut NEW) et notifie WhatsApp + webhook externe, avec dédoublonnage, retries et gestion d'erreurs.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "a20a2f8f-039a-49cd-988d-43bdea4bd986",
+      "name": "1 Cron 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [-2000, -600]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT\n  t.id,\n  t.name AS titre,\n  t.content AS description,\n  t.date AS date_creation,\n  u.name AS demandeur,\n  c.completename AS categorie\nFROM glpi_tickets t\nLEFT JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 1\nLEFT JOIN glpi_users u ON tu.users_id = u.id\nLEFT JOIN glpi_itilcategories c ON t.itilcategories_id = c.id\nWHERE t.status = 1\n  AND t.date >= NOW() - INTERVAL 24 HOUR\nORDER BY t.date ASC;",
+        "options": {}
+      },
+      "id": "9b6e11d0-0e5e-4a48-bac3-b917b3727ab2",
+      "name": "2.1 Tickets GLPI (24 h)",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [-1750, -600],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "mySql": {
+          "id": "vi99ZdDrKTKG0JLD",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id FROM `glpi`;",
+        "options": {}
+      },
+      "id": "3c40cbf3-f1bf-4d35-be97-2abd9aa02950",
+      "name": "2.2 Déjà notifiés",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [-1500, -600],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "mySql": {
+          "id": "jaXOVDwKHEUlFWRK",
+          "name": "MySQL account 61.4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tickets dujour moins les deja notifies, HTML nettoye, message unique construit une seule fois.\nconst tickets = $('2.1 Tickets GLPI (24 h)').all().map((item) => item.json);\nconst dejaNotifies = new Set(\n  $('2.2 Déjà notifiés').all().map((item) => String(item.json.id))\n);\n\nconst decode = (html) => String(html ?? '')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/&quot;/g, '\"')\n  .replace(/&#039;/g, \"'\")\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&');\n\nconst vus = new Set();\nconst sortants = [];\n\nfor (const t of tickets) {\n  const id = String(t && t.id !== undefined ? t.id : '');\n  if (!id || dejaNotifies.has(id) || vus.has(id)) continue;\n  vus.add(id);\n\n  const description = decode(t.description)\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/\\s{2,}/g, ' ')\n    .trim()\n    .substring(0, 3000);\n\n  const demandeur = t.demandeur || 'N/A';\n  const categorie = t.categorie || 'Non définie';\n\n  sortants.push({\n    json: {\n      ...t,\n      description,\n      demandeur,\n      categorie,\n      text:\n        'NOUVEAU TICKET\\n\\n' +\n        'ID: ' + t.id + '\\n' +\n        'Titre: ' + t.titre + '\\n' +\n        'Demandeur: ' + demandeur + '\\n' +\n        'Date: ' + t.date_creation + '\\n' +\n        'Catégorie: ' + categorie + '\\n' +\n        'Description: ' + description,\n    },\n  });\n}\n\nreturn sortants;"
+      },
+      "id": "77ab968f-01f5-42bc-8586-7abfa454fd47",
+      "name": "3 Préparer notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1250, -600]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "620897251110915",
+        "recipientPhoneNumber": "+261323986488",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {
+          "previewUrl": false
+        }
+      },
+      "id": "dfdc8505-9b9a-4467-a323-7bdf595ccd43",
+      "name": "4.1 WhatsApp Direction",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [-1000, -950],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "KenYwsiQtWhrskJx",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "620897251110915",
+        "recipientPhoneNumber": "+261330531966",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {
+          "previewUrl": false
+        }
+      },
+      "id": "cdce29bf-5cf4-4389-a8cb-27a6da06df7f",
+      "name": "4.2 WhatsApp Support",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [-1000, -720],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "KenYwsiQtWhrskJx",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.60.253:8080",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: 'NOUVEAU TICKET', message: { id: $json.id, titre: $json.titre, demandeur: $json.demandeur, date_creation: $json.date_creation, categorie: $json.categorie, description: $json.description } }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "a00cb87b-804a-4c56-ad89-864763f04a50",
+      "name": "4.3 Webhook HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [-1000, -490],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "GLPI Webhook X-API-Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "glpi",
+          "mode": "list",
+          "cachedResultName": "glpi"
+        },
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "column": "titre",
+              "value": "={{ $json.titre }}"
+            },
+            {
+              "column": "description",
+              "value": "={{ $json.description }}"
+            },
+            {
+              "column": "date_creation",
+              "value": "={{ $json.date_creation }}"
+            },
+            {
+              "column": "demandeur",
+              "value": "={{ $json.demandeur }}"
+            },
+            {
+              "column": "categorie",
+              "value": "={{ $json.categorie }}"
+            }
+          ]
+        },
+        "options": {
+          "skipOnConflict": true
+        }
+      },
+      "id": "64a07577-bd28-4dce-8059-910223fd16a4",
+      "name": "5 Marquer notifié",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [-1000, -260],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "mySql": {
+          "id": "jaXOVDwKHEUlFWRK",
+          "name": "MySQL account 61.4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "={{ 'GLPI NOTIF échec : ' + ((typeof $json.error === 'string' && $json.error) || ($json.error && $json.error.message) || $json.message || 'voir lexécution dans n8n') }}"
+      },
+      "id": "3c379fbe-412a-4716-b7d7-c9fa39c981e8",
+      "name": "6 Échec",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [-700, -600]
+    }
+  ],
+  "connections": {
+    "1 Cron 1 min": {
+      "main": [
+        [
+          {
+            "node": "2.1 Tickets GLPI (24 h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2.1 Tickets GLPI (24 h)": {
+      "main": [
+        [
+          {
+            "node": "2.2 Déjà notifiés",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6 Échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2.2 Déjà notifiés": {
+      "main": [
+        [
+          {
+            "node": "3 Préparer notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6 Échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 Préparer notifications": {
+      "main": [
+        [
+          {
+            "node": "4.1 WhatsApp Direction",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "4.2 WhatsApp Support",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "4.3 Webhook HTTP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "5 Marquer notifié",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4.1 WhatsApp Direction": {
+      "main": [
+        [],
+        [
+          {
+            "node": "6 Échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4.2 WhatsApp Support": {
+      "main": [
+        [],
+        [
+          {
+          "node": "6 Échec",
+          "type": "main",
+          "index": 0
+          }
+        ]
+      ]
+    },
+    "4.3 Webhook HTTP": {
+      "main": [
+        [],
+        [
+          {
+            "node": "6 Échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 Marquer notifié": {
+      "main": [
+        [],
+        [
+          {
+            "node": "6 Échec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
