@@ -1,5 +1,5 @@
 {
-  "name": "GLPI NOTIF — optimisé",
+  "name": "GLPI NOTIF",
   "active": false,
   "description": "Surveille les nouveaux tickets GLPI (statut NEW) et notifie WhatsApp + webhook externe, avec dédoublonnage, retries et gestion d'erreurs.",
   "nodes": [
