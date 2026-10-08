@@ -30,12 +30,6 @@ Les etapes sensibles (AD, GLPI, partages, mail…) sont volontairement des
 **nodes HTTP desactives avec URLs placeholder** : chaque équipe les configure avec ses
 propres systemes, sans toucher a la logique du workflow.
 
-## Templates disponibles
-
-| Template | Description | Dossier |
-|---|---|---|
-| **App IT — Validation Onboarding/Offboarding** | Demande IT depuis une app web, actions executees par niveau (stock / superviseur / IT), apercu du mail d'accomplissement avec validation humaine, ou enchainement direct si `validation_mail = OK` | [`app-it-validation/`](./app-it-validation) |
-
 ## Installer n8n
 
 Installation instantanée avec le script officiel (Docker requis) :
